@@ -1,7 +1,7 @@
 ### Webserver configuration
 
-The necessary Apache or Nginx configuration should be written in order to access both the Imagehub itself and the SimpleSAMLphp package which provides authentication with the ADFS.
-A sample Nginx configuration file may look like this (adjust as needed for SSL-enabled webconfiguration):
+The necessary Apache or Nginx configuration should be written in order to access the SimpleSAMLphp package which provides authentication with the Active Directory Federation Services (ADFS).
+A sample Nginx configuration file may look like this:
 ```
 server {
 
@@ -32,12 +32,10 @@ server {
     }
 }
 ```
-This will provide the following:
-* An SSL-enabled virtual host on the domain 'resourcespace.mydomain.com', pointing to the directory /opt/imagehub/public
-* An admin console to help set up and test your simplesamlphp installation
+This will provide an admin console to help set up and test your SimpleSAMLphp installation.
 
 ### SimpleSAMLphp setup
-Now we can set up SimpleSAMLphp to provide authentication through the Active Directory Federation Services. We need to set up the following files for this, in the vendor/simplesamlphp/simplesamlphp/ folder:
+Now we can set up SimpleSAMLphp to provide authentication through the Active Directory Federation Services. We will need to set up the following files for this, in the vendor/simplesamlphp/simplesamlphp/ folder:
 * cert/saml.crt
 * cert/saml.key
 * config/acl.php
@@ -47,7 +45,7 @@ Now we can set up SimpleSAMLphp to provide authentication through the Active Dir
 * metadata/saml20-idp-remote.php
 * metadata/saml20-sp-remote.php
 
-Assuming you already have a valid SSL certificate, copy the .crt and .key files to cert/saml.crt and cert/saml.key.
+Assuming you already have a valid SSL certificate for your domain, copy the .crt and .key files to cert/saml.crt and cert/saml.key.
 
 Next, copy the configuration templates to the config/ folder:
 ```
@@ -59,12 +57,12 @@ Generate a secret salt:
 LC_CTYPE=C tr -c -d '0123456789abcdefghijklmnopqrstuvwxyz' </dev/urandom | dd bs=32 count=1 2>/dev/null;echo
 ```
 
-In config.php, find 'secretsalt' and edit it with the output from the above command.
+In config/config.php, find 'secretsalt' and edit it with the output from the above command.
 Also edit 'auth.adminpassword' to a safe password of your choosing.
 
-To AD FS:
-Go to Windows Administrative Tools, AD FS Management
-In AD FS, Service, go to Endpoints. Under Metadata, find the URL, such as:
+Now, go into ADFS:
+Go to Windows Administrative Tools, ADFS Management
+In ADFS, Service, go to Endpoints. Under Metadata, find the URL, such as:
 /FederationMetadata/2007-06/FederationMetadata.xml
 
 Browse to https://resourcespace.mydomain.com/simplesaml/
@@ -122,7 +120,7 @@ Browse to https://resourcespace.mydomain.com/simplesaml/ again.
 * Under 'SAML 2.0 SP Metadata'
 * Copy the value next to 'Entity ID:'
 
-Go back to AD FS. Relying Party Trusts. At the right, 'Add relying party trust'.
+Go back to ADFS. Relying Party Trusts. At the right, 'Add relying party trust'.
 * Claims aware
 * Import data about the relying party published online or on a local network (first option), paste the 'Entity ID' value from the previous step into the field.
 * Next
