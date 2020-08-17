@@ -1,53 +1,40 @@
 ### Webserver configuration
 
 The necessary Apache or Nginx configuration should be written in order to access both the Imagehub itself and the SimpleSAMLphp package which provides authentication with the ADFS.
-A sample Apache configuration file may look like this:
+A sample Nginx configuration file may look like this (adjust as needed for SSL-enabled webconfiguration):
 ```
-<VirtualHost _default_:443>
+server {
 
-    DocumentRoot "/opt/ImageHub/public"
-    ServerName imagehub.muzee.be:443
+    listen 443 ssl;
+    listen [::]:443 ssl;
 
-    SetEnv SIMPLESAMLPHP_CONFIG_DIR /opt/ImageHub/vendor/simplesamlphp/simplesamlphp/config
+    root /opt/imagehub/public;
 
-    Alias /simplesaml /opt/ImageHub/vendor/simplesamlphp/simplesamlphp/www
+    index index.php;
 
-    SSLProxyEngine On
-    ProxyPass /cantaloupe/iiif/2 https://imagehub.muzee.be:8183/iiif/2
-    ProxyPassReverse /cantaloupe/iiif/2 https://imagehub.muzee.be:8183/iiif/2
+    server_name resourcespace.mydomain.com;
 
-    <Directory /opt/imagehub/public>
-      <IfModule !mod_authz_core.c>
-        # For Apache 2.2:
-        AllowOverride All
-        Order allow,deny
-        Allow from all
-      </IfModule>
-      <IfModule mod_authz_core.c>
-        # For Apache 2.4:
-        AllowOverride All
-        Require all granted
-      </IfModule>
-    </Directory>
-    <Directory /opt/imagehub/vendor/simplesamlphp/simplesamlphp/www>
-      <IfModule !mod_authz_core.c>
-        # For Apache 2.2:
-        AllowOverride All
-        Order allow,deny
-        Allow from all
-      </IfModule>
-      <IfModule mod_authz_core.c>
-        # For Apache 2.4:
-        AllowOverride All
-        Require all granted
-      </IfModule>
-    </Directory>
-</VirtualHost>
+    location ^~ /simplesaml {
+        alias /opt/imagehub/vendor/simplesamlphp/simplesamlphp/www;
+
+        # The prefix must match the baseurlpath configuration option
+        location ~ ^(?<prefix>/simplesaml)(?<phpfile>.+?\.php)(?<pathinfo>/.*)?$ {
+            include fastcgi_params;
+            fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$phpfile;
+
+            # Must be prepended with the baseurlpath
+            fastcgi_param SCRIPT_NAME /simplesaml$phpfile;
+
+            fastcgi_param PATH_INFO $pathinfo if_not_empty;
+        }
+    }
+}
 ```
 This will provide the following:
-* An SSL-enabled virtual host on the domain 'imagehub.muzee.local' (keep in mind you'll need a valid SSL certificate for this), pointing to the directory /opt/Imagehub/public
+* An SSL-enabled virtual host on the domain 'resourcespace.mydomain.com', pointing to the directory /opt/imagehub/public
 * An admin console to help set up and test your simplesamlphp installation
-* A reverse proxy that points to your Cantaloupe image server, in order to prevent issues with Cross-Origin Resource Sharing (CORS) in a IIIF viewer.
 
 ### SimpleSAMLphp setup
 Now we can set up SimpleSAMLphp to provide authentication through the Active Directory Federation Services. We need to set up the following files for this, in the vendor/simplesamlphp/simplesamlphp/ folder:
@@ -60,11 +47,7 @@ Now we can set up SimpleSAMLphp to provide authentication through the Active Dir
 * metadata/saml20-idp-remote.php
 * metadata/saml20-sp-remote.php
 
-From the command line:
-```
-openssl req -x509 -nodes -sha256 -days 3653 -newkey rsa:2048 -keyout saml.key -out saml.crt
-```
-Then copy the saml.key and saml.crt to the cert/ folder.
+Assuming you already have a valid SSL certificate, copy the .crt and .key files to cert/saml.crt and cert/saml.key.
 
 Next, copy the configuration templates to the config/ folder:
 ```
@@ -76,15 +59,15 @@ Generate a secret salt:
 LC_CTYPE=C tr -c -d '0123456789abcdefghijklmnopqrstuvwxyz' </dev/urandom | dd bs=32 count=1 2>/dev/null;echo
 ```
 
-In config.php, find secretsalt and edit it with the output from the above command.
-Also edit auth.adminpassword to a safe password of your choosing.
+In config.php, find 'secretsalt' and edit it with the output from the above command.
+Also edit 'auth.adminpassword' to a safe password of your choosing.
 
 To AD FS:
-Windows Administrative Tools, AD FS Management
-In AD FS, Service, Endpoints. Under Metadata, find the URL, such as:
+Go to Windows Administrative Tools, AD FS Management
+In AD FS, Service, go to Endpoints. Under Metadata, find the URL, such as:
 /FederationMetadata/2007-06/FederationMetadata.xml
 
-Browse to https://resourcespace.muzee.be/simplesaml/
+Browse to https://resourcespace.mydomain.com/simplesaml/
 * Tab Federation (Federatie)
 * Tools
 * XML to SimpleSAMphp metadata converter.
@@ -134,7 +117,7 @@ In config/authsources.php, replace the block 'default-sp' with the following:
   ),
 ```
 
-Browse to https://resourcespace.muzee.be/simplesaml/ again.
+Browse to https://resourcespace.mydomain.com/simplesaml/ again.
 * Tab Federation (Federatie)
 * Under 'SAML 2.0 SP Metadata'
 * Copy the value next to 'Entity ID:'
@@ -168,7 +151,7 @@ Add rule
   * Outgoing name ID format: Transient Identifier
   * Check 'Pass through all claim values'
 
-Browse to https://resourcespace.muzee.be/simplesaml/ again.
+Browse to https://resourcespace.mydomain.com/simplesaml/ again.
 * Tab Authentication
 * Test configured authentication sources
 * default-sp
